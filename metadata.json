@@ -1,0 +1,6 @@
+{
+  "name": "Zealous",
+  "description": "A high-fidelity minimalist online calendar space with interactive 3D card flips, featuring a curated grid showcase and a custom administrative content upload manager.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
