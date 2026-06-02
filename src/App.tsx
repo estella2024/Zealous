@@ -11,6 +11,8 @@ import {
 import { Card } from "./types";
 
 export default function App() {
+  const MAX_CARD_IMAGE_BYTES = 850 * 1024;
+  const MAX_CARD_IMAGE_DIMENSION = 1600;
   const [cards, setCards] = useState<Card[]>([]);
   const [flippedCards, setFlippedCards] = useState<Record<string, boolean>>({});
   const [hiddenCardIds, setHiddenCardIds] = useState<Record<string, boolean>>({});
@@ -27,6 +29,7 @@ export default function App() {
   const [uploadImageFile, setUploadImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPreparingImage, setIsPreparingImage] = useState(false);
   const [dragActive, setDragActive] = useState(false);
 
   const [bgmUrl, setBgmUrl] = useState<string | null>(null);
@@ -59,6 +62,76 @@ export default function App() {
     }
 
     return fallback;
+  };
+
+  const blobToFile = (blob: Blob, filename: string) => {
+    const extension = blob.type === "image/webp" ? "webp" : "jpg";
+    const stem = filename.replace(/\.[^.]+$/, "") || "card-image";
+    return new File([blob], `${stem}.${extension}`, { type: blob.type });
+  };
+
+  const loadImageElement = (file: File) =>
+    new Promise<HTMLImageElement>((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file);
+      const image = new Image();
+
+      image.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(image);
+      };
+      image.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Unable to read the selected image."));
+      };
+
+      image.src = objectUrl;
+    });
+
+  const canvasToBlob = (canvas: HTMLCanvasElement, type: string, quality?: number) =>
+    new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((blob) => resolve(blob), type, quality);
+    });
+
+  const prepareImageForUpload = async (file: File) => {
+    if (file.size <= MAX_CARD_IMAGE_BYTES) {
+      return file;
+    }
+
+    const image = await loadImageElement(file);
+    let width = image.naturalWidth || image.width;
+    let height = image.naturalHeight || image.height;
+    const scale = Math.min(1, MAX_CARD_IMAGE_DIMENSION / Math.max(width, height));
+    width = Math.max(1, Math.round(width * scale));
+    height = Math.max(1, Math.round(height * scale));
+
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Unable to optimize the selected image.");
+    }
+
+    const mimeTypes = ["image/webp", "image/jpeg"];
+
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      canvas.width = width;
+      canvas.height = height;
+      context.clearRect(0, 0, width, height);
+      context.drawImage(image, 0, 0, width, height);
+
+      for (const mimeType of mimeTypes) {
+        for (const quality of [0.88, 0.8, 0.72, 0.64, 0.56, 0.48]) {
+          const blob = await canvasToBlob(canvas, mimeType, quality);
+          if (blob && blob.size <= MAX_CARD_IMAGE_BYTES) {
+            return blobToFile(blob, file.name);
+          }
+        }
+      }
+
+      width = Math.max(640, Math.round(width * 0.82));
+      height = Math.max(640, Math.round(height * 0.82));
+    }
+
+    throw new Error("This image is still too large after optimization. Please export a smaller file and try again.");
   };
 
   const fetchCards = async () => {
@@ -340,18 +413,29 @@ export default function App() {
     }
   };
 
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
     if (!file.type.startsWith("image/")) {
       alert("Please upload a valid image file.");
       return;
     }
 
-    if (imagePreview) {
-      URL.revokeObjectURL(imagePreview);
-    }
+    setIsPreparingImage(true);
 
-    setUploadImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+    try {
+      const preparedFile = await prepareImageForUpload(file);
+
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+
+      setUploadImageFile(preparedFile);
+      setImagePreview(URL.createObjectURL(preparedFile));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to prepare the selected image.";
+      alert(message);
+    } finally {
+      setIsPreparingImage(false);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -360,13 +444,13 @@ export default function App() {
     setDragActive(false);
 
     if (e.dataTransfer.files?.[0]) {
-      processFile(e.dataTransfer.files[0]);
+      void processFile(e.dataTransfer.files[0]);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
-      processFile(e.target.files[0]);
+      void processFile(e.target.files[0]);
     }
   };
 
@@ -374,6 +458,11 @@ export default function App() {
     e.preventDefault();
     if (!uploadTitle.trim()) {
       alert("Please provide the card's flipside title.");
+      return;
+    }
+
+    if (isPreparingImage) {
+      alert("The image is still being optimized. Please wait a moment and try again.");
       return;
     }
 
@@ -624,13 +713,13 @@ export default function App() {
                   </div>
                 </div>
 
-                <button
+                  <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isPreparingImage}
                   className="flex w-full items-center justify-center gap-3 border border-neutral-900 bg-neutral-900 px-6 py-5 font-mono text-[13px] font-bold uppercase tracking-[0.22em] text-white transition hover:bg-neutral-800 disabled:opacity-60"
                 >
                   {isSubmitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                  {isSubmitting ? "Publishing Content..." : "Publish to Gallery Grid"}
+                  {isPreparingImage ? "Optimizing Image..." : isSubmitting ? "Publishing Content..." : "Publish to Gallery Grid"}
                 </button>
               </form>
 
