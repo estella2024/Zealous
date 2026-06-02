@@ -19,6 +19,8 @@ const app = express();
 const store = getStore("zealous-data");
 
 const CARDS_KEY = "cards/cards.json";
+const CARD_IMAGE_PREFIX = "cards/images/";
+const CARD_ASSET_ROUTE = "/api/card-assets/";
 const BGM_META_KEY = "audio/bgm-meta.json";
 const BGM_PREFIX = "audio/bgm";
 const DEFAULT_BGM_URL = "/seed-assets/BGM.m4a";
@@ -126,6 +128,73 @@ const DEFAULT_CARDS: Card[] = [
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+function slugifyFilenamePart(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40) || "card";
+}
+
+function getExtensionFromFilename(filename: string) {
+  const match = filename.toLowerCase().match(/\.([a-z0-9]+)$/);
+  return match ? `.${match[1]}` : "";
+}
+
+function getExtensionFromContentType(contentType: string) {
+  if (contentType === "image/jpeg") return ".jpg";
+  if (contentType === "image/png") return ".png";
+  if (contentType === "image/webp") return ".webp";
+  if (contentType === "image/gif") return ".gif";
+  if (contentType === "image/svg+xml") return ".svg";
+  return "";
+}
+
+function buildCardAssetKey(filename: string, contentType: string) {
+  const extension = getExtensionFromFilename(filename) || getExtensionFromContentType(contentType) || ".bin";
+  const stem = slugifyFilenamePart(filename.replace(/\.[^.]+$/, ""));
+  return `${CARD_IMAGE_PREFIX}${Date.now()}-${stem}${extension}`;
+}
+
+function getCardAssetUrl(blobKey: string) {
+  return `${CARD_ASSET_ROUTE}${encodeURIComponent(blobKey)}`;
+}
+
+function getCardAssetKeyFromUrl(image?: string) {
+  if (!image || !image.startsWith(CARD_ASSET_ROUTE)) return null;
+  return decodeURIComponent(image.slice(CARD_ASSET_ROUTE.length));
+}
+
+function parseDataUrl(value: string) {
+  const match = value.match(/^data:([^;,]+);base64,(.+)$/);
+  if (!match) return null;
+
+  return {
+    contentType: match[1],
+    base64: match[2],
+  };
+}
+
+async function persistLegacyCardImage(image: string) {
+  const parsed = parseDataUrl(image);
+  if (!parsed) return image;
+
+  const blobKey = buildCardAssetKey("uploaded-image", parsed.contentType);
+  const buffer = Buffer.from(parsed.base64, "base64");
+  await store.set(blobKey, buffer, {
+    cacheControl: "public, max-age=31536000, immutable",
+  });
+  return getCardAssetUrl(blobKey);
+}
+
+async function deleteCardAssets(cards: Card[]) {
+  const keys = cards
+    .map((card) => getCardAssetKeyFromUrl(card.image))
+    .filter((key): key is string => Boolean(key));
+
+  await Promise.allSettled(keys.map((key) => store.delete(key)));
+}
+
 function normalizeExtension(extension?: string) {
   if (!extension) return ".mp3";
   return extension.startsWith(".") ? extension.toLowerCase() : `.${extension.toLowerCase()}`;
@@ -210,6 +279,70 @@ async function getActiveBgmSource() {
   };
 }
 
+app.post("/cards/upload-url", async (req, res) => {
+  const { filename, contentType } = req.body ?? {};
+  if (typeof filename !== "string" || filename.trim().length === 0) {
+    res.status(400).json({ error: "Image filename is required." });
+    return;
+  }
+
+  if (typeof contentType !== "string" || !contentType.startsWith("image/")) {
+    res.status(400).json({ error: "Only image uploads are supported for gallery cards." });
+    return;
+  }
+
+  try {
+    const key = buildCardAssetKey(filename, contentType);
+    const upload = await store.createUploadUrl(key, {
+      contentType,
+      expireSeconds: 900,
+    });
+
+    res.json({
+      url: upload.url,
+      key,
+      imageUrl: getCardAssetUrl(key),
+      expiresAt: upload.expiresAt,
+    });
+  } catch (error) {
+    console.error("Failed to create upload URL", error);
+    res.status(500).json({ error: "Unable to prepare image upload." });
+  }
+});
+
+app.get("/card-assets/*", async (req, res) => {
+  const rawKey = req.params[0];
+  const blobKey = typeof rawKey === "string" ? decodeURIComponent(rawKey) : "";
+  if (!blobKey.startsWith(CARD_IMAGE_PREFIX)) {
+    res.status(404).json({ error: "Card image not found." });
+    return;
+  }
+
+  try {
+    const [buffer, metadata] = await Promise.all([
+      store.get(blobKey, { type: "arrayBuffer", consistency: "strong" }),
+      store.getMetadata(blobKey, { consistency: "strong" }),
+    ]);
+
+    if (!buffer) {
+      res.status(404).json({ error: "Card image not found." });
+      return;
+    }
+
+    if (metadata?.contentType) {
+      res.setHeader("Content-Type", metadata.contentType);
+    }
+    if (metadata?.cacheControl) {
+      res.setHeader("Cache-Control", metadata.cacheControl);
+    }
+
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    console.error("Failed to read card image", error);
+    res.status(500).json({ error: "Unable to load card image." });
+  }
+});
+
 app.get("/cards", async (_req, res) => {
   try {
     const cards = await readCards();
@@ -221,7 +354,7 @@ app.get("/cards", async (_req, res) => {
 });
 
 app.post("/cards", async (req, res) => {
-  const { image, text, quote } = req.body;
+  const { image, imageKey, text, quote } = req.body;
   if (!text) {
     res.status(400).json({ error: "Text is required for a valid card flipside." });
     return;
@@ -235,7 +368,12 @@ app.post("/cards", async (req, res) => {
     const newCard: Card = {
       id: Date.now().toString(),
       number: nextNumber,
-      image: image || "",
+      image:
+        typeof imageKey === "string" && imageKey.startsWith(CARD_IMAGE_PREFIX)
+          ? getCardAssetUrl(imageKey)
+          : typeof image === "string" && image.length > 0
+            ? await persistLegacyCardImage(image)
+            : "",
       text,
       quote: typeof quote === "string" ? quote : "",
     };
@@ -251,6 +389,8 @@ app.post("/cards", async (req, res) => {
 
 app.post("/cards/reset", async (_req, res) => {
   try {
+    const existingCards = await readCards();
+    await deleteCardAssets(existingCards);
     await writeCards(DEFAULT_CARDS);
     res.json({ message: "Default cards reset successfully.", cards: DEFAULT_CARDS });
   } catch (error) {
@@ -270,13 +410,17 @@ app.delete("/cards/:id", async (req, res) => {
       return;
     }
 
-    cards.splice(index, 1);
+    const [removedCard] = cards.splice(index, 1);
     cards = cards.map((card, cardIndex) => ({
       ...card,
       number: cardIndex + 1,
     }));
 
     await writeCards(cards);
+    const assetKey = getCardAssetKeyFromUrl(removedCard?.image);
+    if (assetKey) {
+      await store.delete(assetKey);
+    }
     res.json({ message: "Card deleted, subsequent cards renumbered." });
   } catch (error) {
     console.error("Failed to delete card", error);

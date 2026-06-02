@@ -24,7 +24,7 @@ export default function App() {
   const [authError, setAuthError] = useState("");
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadQuote, setUploadQuote] = useState("");
-  const [uploadImage, setUploadImage] = useState("");
+  const [uploadImageFile, setUploadImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -39,6 +39,27 @@ export default function App() {
   const [pendingAudioName, setPendingAudioName] = useState("");
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const clearImageSelection = () => {
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    setUploadImageFile(null);
+    setImagePreview("");
+  };
+
+  const readErrorMessage = async (response: Response, fallback: string) => {
+    try {
+      const result = await response.json();
+      if (typeof result?.error === "string" && result.error.length > 0) {
+        return result.error;
+      }
+    } catch (_error) {
+      // Ignore JSON parsing failures and fall back to the default message.
+    }
+
+    return fallback;
+  };
 
   const fetchCards = async () => {
     try {
@@ -164,6 +185,14 @@ export default function App() {
       window.removeEventListener("touchstart", handleFirstClick);
     };
   }, [hasStartedMusic]);
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
 
   const toggleMute = () => {
     const nextMute = !isMuted;
@@ -317,13 +346,12 @@ export default function App() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setUploadImage(result);
-      setImagePreview(result);
-    };
-    reader.readAsDataURL(file);
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
+
+    setUploadImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -351,26 +379,57 @@ export default function App() {
 
     setIsSubmitting(true);
     try {
+      let imageKey = "";
+
+      if (uploadImageFile) {
+        const uploadUrlResponse = await fetch("/api/cards/upload-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: uploadImageFile.name,
+            contentType: uploadImageFile.type || "application/octet-stream",
+          }),
+        });
+
+        if (!uploadUrlResponse.ok) {
+          throw new Error(await readErrorMessage(uploadUrlResponse, "Unable to prepare image upload."));
+        }
+
+        const uploadTarget = (await uploadUrlResponse.json()) as { url: string; key: string };
+        const uploadResponse = await fetch(uploadTarget.url, {
+          method: "PUT",
+          body: uploadImageFile,
+          headers: {
+            "Content-Type": uploadImageFile.type || "application/octet-stream",
+          },
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error("Unable to upload the image file.");
+        }
+
+        imageKey = uploadTarget.key;
+      }
+
       const response = await fetch("/api/cards", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          image: uploadImage,
+          imageKey,
           text: uploadTitle.trim(),
           quote: uploadQuote.trim(),
         }),
       });
 
       if (!response.ok) {
-        throw new Error("Unable to publish new card.");
+        throw new Error(await readErrorMessage(response, "Unable to publish new card."));
       }
 
       const published = (await response.json()) as Card;
       setCards((prev) => [...prev, published]);
       setUploadTitle("");
       setUploadQuote("");
-      setUploadImage("");
-      setImagePreview("");
+      clearImageSelection();
       alert(`Card #${published.number} published successfully.`);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Publishing failed.";
@@ -507,10 +566,7 @@ export default function App() {
                           <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.12em] text-neutral-500">1:1 ratio is maintained for the gallery card.</p>
                           <button
                             type="button"
-                            onClick={() => {
-                              setUploadImage("");
-                              setImagePreview("");
-                            }}
+                            onClick={clearImageSelection}
                             className="mt-3 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-700 underline"
                           >
                             Remove image
