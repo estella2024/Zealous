@@ -22,6 +22,10 @@ const DEFAULT_BGM_FILE = path.join(process.cwd(), "public", "seed-assets", "BGM.
 const BGM_META_FILE = path.join(DATA_DIR, "bgm.json");
 const CARD_IMAGE_PREFIX = "cards/images/";
 const CARD_ASSET_ROUTE = "/api/card-assets/";
+const SEED_IMAGE_MIGRATIONS: Record<string, string> = {
+  "/seed-assets/sketch/12-anti-vision.png": "/seed-assets/sketch/12-anti-vision.jpg",
+  "/seed-assets/sketch/13-real-you.png": "/seed-assets/sketch/13-real-you.jpg"
+};
 
 // Ensure the data folder and JSON store exist
 if (!fs.existsSync(DATA_DIR)) {
@@ -113,18 +117,54 @@ const DEFAULT_CARDS = [
   {
     id: "12",
     number: 12,
-    image: "/seed-assets/sketch/12-anti-vision.png",
+    image: "/seed-assets/sketch/12-anti-vision.jpg",
     text: "反愿景是一种稀缺资源",
     quote: "如果 vision 是所有人都知道的方向，那么 anti-vision 就是那些还没有被说出口的反方向。"
   },
   {
     id: "13",
     number: 13,
-    image: "/seed-assets/sketch/13-real-you.png",
+    image: "/seed-assets/sketch/13-real-you.jpg",
     text: "离开公司或平台，你还是你吗？",
     quote: "是「你」的，却不是「公司/平台」的能力，是什么？\n你的身份，\n是一个 passenger、一个 stakeholder、一个 autonomist？"
   }
 ];
+
+function getSeedImageForCardNumber(number?: number) {
+  if (number === 12) return "/seed-assets/sketch/12-anti-vision.jpg";
+  if (number === 13) return "/seed-assets/sketch/13-real-you.jpg";
+  return null;
+}
+
+function migrateSeedImagePath(image?: string) {
+  if (typeof image !== "string") return image;
+  return SEED_IMAGE_MIGRATIONS[image] ?? image;
+}
+
+function normalizeCards(cards: any[]) {
+  let changed = false;
+
+  const normalized = cards.map((card) => {
+    const nextSeedImage = getSeedImageForCardNumber(card?.number);
+    let nextImage = migrateSeedImagePath(card?.image);
+
+    if (nextSeedImage && typeof card?.image === "string" && card.image.startsWith("data:image/")) {
+      nextImage = nextSeedImage;
+    }
+
+    if (nextImage !== card?.image) {
+      changed = true;
+      return {
+        ...card,
+        image: nextImage
+      };
+    }
+
+    return card;
+  });
+
+  return { cards: normalized, changed };
+}
 
 function slugifyFilenamePart(value: string) {
   return value
@@ -217,7 +257,14 @@ function readCards(): any[] {
   try {
     if (fs.existsSync(CARDS_FILE)) {
       const data = fs.readFileSync(CARDS_FILE, "utf-8");
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) {
+        const normalized = normalizeCards(parsed);
+        if (normalized.changed) {
+          writeCards(normalized.cards);
+        }
+        return normalized.cards;
+      }
     }
   } catch (error) {
     console.error("Error reading cards list", error);

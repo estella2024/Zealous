@@ -24,6 +24,10 @@ const CARD_ASSET_ROUTE = "/api/card-assets/";
 const BGM_META_KEY = "audio/bgm-meta.json";
 const BGM_PREFIX = "audio/bgm";
 const DEFAULT_BGM_URL = "/seed-assets/BGM.m4a";
+const SEED_IMAGE_MIGRATIONS: Record<string, string> = {
+  "/seed-assets/sketch/12-anti-vision.png": "/seed-assets/sketch/12-anti-vision.jpg",
+  "/seed-assets/sketch/13-real-you.png": "/seed-assets/sketch/13-real-you.jpg",
+};
 const AUDIO_MIME_BY_EXTENSION: Record<string, string> = {
   ".mp3": "audio/mpeg",
   ".m4a": "audio/mp4",
@@ -111,14 +115,14 @@ const DEFAULT_CARDS: Card[] = [
   {
     id: "12",
     number: 12,
-    image: "/seed-assets/sketch/12-anti-vision.png",
+    image: "/seed-assets/sketch/12-anti-vision.jpg",
     text: "反愿景是一种稀缺资源",
     quote: "如果 vision 是所有人都知道的方向，那么 anti-vision 就是那些还没有被说出口的反方向。",
   },
   {
     id: "13",
     number: 13,
-    image: "/seed-assets/sketch/13-real-you.png",
+    image: "/seed-assets/sketch/13-real-you.jpg",
     text: "离开公司或平台，你还是你吗？",
     quote:
       "是「你」的，却不是「公司/平台」的能力，是什么？\n你的身份，\n是一个 passenger、一个 stakeholder、一个 autonomist？",
@@ -195,6 +199,42 @@ async function deleteCardAssets(cards: Card[]) {
   await Promise.allSettled(keys.map((key) => store.delete(key)));
 }
 
+function getSeedImageForCardNumber(number?: number) {
+  if (number === 12) return "/seed-assets/sketch/12-anti-vision.jpg";
+  if (number === 13) return "/seed-assets/sketch/13-real-you.jpg";
+  return null;
+}
+
+function migrateSeedImagePath(image?: string) {
+  if (typeof image !== "string") return image;
+  return SEED_IMAGE_MIGRATIONS[image] ?? image;
+}
+
+function normalizeCards(cards: Card[]) {
+  let changed = false;
+
+  const normalized = cards.map((card) => {
+    const nextSeedImage = getSeedImageForCardNumber(card.number);
+    let nextImage = migrateSeedImagePath(card.image);
+
+    if (nextSeedImage && typeof card.image === "string" && card.image.startsWith("data:image/")) {
+      nextImage = nextSeedImage;
+    }
+
+    if (nextImage !== card.image) {
+      changed = true;
+      return {
+        ...card,
+        image: nextImage,
+      };
+    }
+
+    return card;
+  });
+
+  return { cards: normalized, changed };
+}
+
 function normalizeExtension(extension?: string) {
   if (!extension) return ".mp3";
   return extension.startsWith(".") ? extension.toLowerCase() : `.${extension.toLowerCase()}`;
@@ -221,7 +261,11 @@ async function readCards() {
       return DEFAULT_CARDS;
     }
 
-    return cards as Card[];
+    const normalized = normalizeCards(cards as Card[]);
+    if (normalized.changed) {
+      await store.setJSON(CARDS_KEY, normalized.cards);
+    }
+    return normalized.cards;
   }
 
   await store.setJSON(CARDS_KEY, DEFAULT_CARDS);
