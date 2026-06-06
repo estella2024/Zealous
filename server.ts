@@ -23,8 +23,10 @@ const BGM_META_FILE = path.join(DATA_DIR, "bgm.json");
 const CARD_IMAGE_PREFIX = "cards/images/";
 const CARD_ASSET_ROUTE = "/api/card-assets/";
 const SEED_IMAGE_MIGRATIONS: Record<string, string> = {
-  "/seed-assets/sketch/12-anti-vision.png": "/seed-assets/sketch/12-anti-vision.jpg",
-  "/seed-assets/sketch/13-real-you.png": "/seed-assets/sketch/13-real-you.jpg"
+  "/seed-assets/sketch/12-anti-vision.png": "/seed-assets/sketch/12-anti-vision-v2.jpg",
+  "/seed-assets/sketch/12-anti-vision.jpg": "/seed-assets/sketch/12-anti-vision-v2.jpg",
+  "/seed-assets/sketch/13-real-you.png": "/seed-assets/sketch/13-real-you-v2.jpg",
+  "/seed-assets/sketch/13-real-you.jpg": "/seed-assets/sketch/13-real-you-v2.jpg"
 };
 
 // Ensure the data folder and JSON store exist
@@ -117,22 +119,22 @@ const DEFAULT_CARDS = [
   {
     id: "12",
     number: 12,
-    image: "/seed-assets/sketch/12-anti-vision.jpg",
+    image: "/seed-assets/sketch/12-anti-vision-v2.jpg",
     text: "反愿景是一种稀缺资源",
     quote: "如果 vision 是所有人都知道的方向，那么 anti-vision 就是那些还没有被说出口的反方向。"
   },
   {
     id: "13",
     number: 13,
-    image: "/seed-assets/sketch/13-real-you.jpg",
+    image: "/seed-assets/sketch/13-real-you-v2.jpg",
     text: "离开公司或平台，你还是你吗？",
     quote: "是「你」的，却不是「公司/平台」的能力，是什么？\n你的身份，\n是一个 passenger、一个 stakeholder、一个 autonomist？"
   }
 ];
 
 function getSeedImageForCardNumber(number?: number) {
-  if (number === 12) return "/seed-assets/sketch/12-anti-vision.jpg";
-  if (number === 13) return "/seed-assets/sketch/13-real-you.jpg";
+  if (number === 12) return "/seed-assets/sketch/12-anti-vision-v2.jpg";
+  if (number === 13) return "/seed-assets/sketch/13-real-you-v2.jpg";
   return null;
 }
 
