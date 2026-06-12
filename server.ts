@@ -4,7 +4,8 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
+const HOST = process.env.HOST || "0.0.0.0";
 const AUDIO_MIME_BY_EXTENSION: Record<string, string> = {
   ".mp3": "audio/mpeg",
   ".m4a": "audio/mp4",
@@ -550,8 +551,8 @@ async function setupServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Express API Server] Active on port ${PORT}`);
+  app.listen(PORT, HOST, () => {
+    console.log(`[Express API Server] Active on http://${HOST}:${PORT}`);
   });
 }
 

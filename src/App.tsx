@@ -951,11 +951,11 @@ export default function App() {
 
                       <div className="card-frame absolute inset-0 flex h-full w-full rotate-y-180 flex-col justify-between overflow-y-auto rounded-[6px] bg-white px-4 pb-4 pt-3 backface-hidden">
                         <div className="flex flex-1 flex-col items-center justify-start gap-3 pt-3">
-                          <p className="text-center font-serif text-[10px] font-semibold leading-relaxed tracking-[0.02em] text-neutral-900 sm:text-[10px] md:text-[12px]">
+                          <p className="whitespace-pre-wrap text-center font-serif text-[10px] font-semibold leading-relaxed tracking-[0.02em] text-neutral-900 sm:text-[10px] md:text-[12px]">
                             {card.text}
                           </p>
                           {card.quote ? (
-                            <p className="max-w-[18ch] text-center font-serif text-[10px] leading-relaxed text-neutral-600 sm:text-[10px] md:text-[12px]">
+                            <p className="max-w-[18ch] whitespace-pre-wrap text-center font-serif text-[10px] leading-relaxed text-neutral-600 sm:text-[10px] md:text-[12px]">
                               {card.quote}
                             </p>
                           ) : null}
