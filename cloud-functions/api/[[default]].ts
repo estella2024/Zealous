@@ -1,5 +1,5 @@
 import express from "express";
-import { getStore } from "@edgeone/pages-blob";
+import { getStore, listStores } from "@edgeone/pages-blob";
 
 type Card = {
   id: string;
@@ -24,6 +24,7 @@ const CARD_ASSET_ROUTE = "/api/card-assets/";
 const BGM_META_KEY = "audio/bgm-meta.json";
 const BGM_PREFIX = "audio/bgm";
 const DEFAULT_BGM_URL = "/seed-assets/BGM.m4a";
+const DIAGNOSTIC_ACCESS_KEY = "21877273126080";
 const SEED_IMAGE_MIGRATIONS: Record<string, string> = {
   "/seed-assets/sketch/12-anti-vision.png": "/seed-assets/sketch/12-anti-vision-v2.jpg",
   "/seed-assets/sketch/12-anti-vision.jpg": "/seed-assets/sketch/12-anti-vision-v2.jpg",
@@ -133,6 +134,10 @@ const DEFAULT_CARDS: Card[] = [
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+function hasDiagnosticAccess(value: unknown) {
+  return typeof value === "string" && value === DIAGNOSTIC_ACCESS_KEY;
+}
 
 function slugifyFilenamePart(value: string) {
   return value
@@ -324,6 +329,55 @@ async function getActiveBgmSource() {
     blobKey: getBgmBlobKey(meta.extension),
   };
 }
+
+app.get("/diagnostics/blob", async (req, res) => {
+  if (!hasDiagnosticAccess(req.query.key)) {
+    res.status(404).json({ error: "Not found." });
+    return;
+  }
+
+  try {
+    const listProjectStores = listStores as unknown as (options?: {
+      consistency?: "strong" | "eventual";
+    }) => ReturnType<typeof listStores>;
+    const storeList = await listProjectStores({ consistency: "strong" });
+    const names = new Set<string>(["zealous-data"]);
+    for (const item of storeList.stores) {
+      if (item.name) {
+        names.add(item.name);
+      }
+    }
+
+    const snapshots = await Promise.all(
+      Array.from(names).map(async (name) => {
+        const targetStore = name === "zealous-data" ? store : getStore(name);
+        const list = await targetStore.list({ consistency: "strong" });
+        const blobs = await Promise.all(
+          list.blobs.map(async (blob) => ({
+            ...blob,
+            metadata: await targetStore.getMetadata(blob.key, { consistency: "strong" }),
+          }))
+        );
+
+        return {
+          name,
+          blobCount: blobs.length,
+          directories: list.directories,
+          blobs,
+        };
+      })
+    );
+
+    res.json({
+      checkedAt: new Date().toISOString(),
+      storeCount: storeList.stores.length,
+      stores: snapshots,
+    });
+  } catch (error) {
+    console.error("Failed to inspect blob storage", error);
+    res.status(500).json({ error: "Failed to inspect blob storage." });
+  }
+});
 
 app.post("/cards/upload-url", async (req, res) => {
   const { filename, contentType } = req.body ?? {};
