@@ -741,29 +741,31 @@ export default function App() {
               </form>
 
               <aside className="space-y-6 pt-5">
-                <div className="h-[196px] border border-neutral-300 bg-[#fffefd]">
-                  <label className="relative flex h-full cursor-pointer flex-col items-center justify-center px-8 py-8 text-center">
-                    <Upload className="mb-4 h-11 w-11 text-neutral-400" />
-                    <span className="font-serif text-[17px] font-semibold italic text-neutral-800 md:text-[18px]">
-                      {isBgmUploading ? "Processing..." : "Select Audio File"}
-                    </span>
-                    <span className="mt-2 font-mono text-[11px] uppercase tracking-[0.14em] text-neutral-400">MP3, WAV, or M4A formats</span>
-                    {pendingAudioName && (
-                      <span className="mt-4 font-mono text-[10px] uppercase tracking-[0.12em] text-neutral-500">
-                        {pendingAudioName}
+                <div className="space-y-4">
+                  <div className="h-[196px] border border-neutral-300 bg-[#fffefd]">
+                    <label className="relative flex h-full cursor-pointer flex-col items-center justify-center px-8 py-8 text-center">
+                      <Upload className="mb-4 h-11 w-11 text-neutral-400" />
+                      <span className="font-serif text-[17px] font-semibold italic text-neutral-800 md:text-[18px]">
+                        {isBgmUploading ? "Processing..." : "Select Audio File"}
                       </span>
-                    )}
-                    <input
-                      type="file"
-                      accept="audio/*"
-                      onChange={handleAudioSelection}
-                      disabled={isBgmUploading}
-                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                    />
-                  </label>
+                      <span className="mt-2 font-mono text-[11px] uppercase tracking-[0.14em] text-neutral-400">MP3, WAV, or M4A formats</span>
+                      {pendingAudioName && (
+                        <span className="mt-4 font-mono text-[10px] uppercase tracking-[0.12em] text-neutral-500">
+                          {pendingAudioName}
+                        </span>
+                      )}
+                      <input
+                        type="file"
+                        accept="audio/*"
+                        onChange={handleAudioSelection}
+                        disabled={isBgmUploading}
+                        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                      />
+                    </label>
+                  </div>
 
                   {bgmUploadError && (
-                    <p className="mx-8 mb-8 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{bgmUploadError}</p>
+                    <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{bgmUploadError}</p>
                   )}
 
                   {hasCustomBgm && (
@@ -771,7 +773,7 @@ export default function App() {
                       type="button"
                       onClick={handleResetBgm}
                       disabled={isBgmUploading}
-                      className="mt-5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-700 underline"
+                      className="block font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-700 underline"
                     >
                       Clear custom / 回到默认 BGM
                     </button>
