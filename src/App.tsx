@@ -20,6 +20,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   const [isAdminMode, setIsAdminMode] = useState(false);
+  const [adminAccessKey, setAdminAccessKey] = useState("");
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isAuthPromptOpen, setIsAuthPromptOpen] = useState(false);
   const [curatorAnswer, setCuratorAnswer] = useState("");
@@ -190,8 +191,10 @@ export default function App() {
 
   const handleUnlockSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (curatorAnswer.trim() === "21877273126080") {
+    const answer = curatorAnswer.trim();
+    if (answer === "21877273126080") {
       setIsAdminMode(true);
+      setAdminAccessKey(answer);
       setIsAdminOpen(true);
       setIsAuthPromptOpen(false);
       setAuthError("");
@@ -199,6 +202,10 @@ export default function App() {
     }
     setAuthError("Incorrect answer. Access denied.");
   };
+
+  const getAdminHeaders = () => ({
+    "x-admin-key": adminAccessKey,
+  });
 
   useEffect(() => {
     fetchCards();
@@ -322,7 +329,7 @@ export default function App() {
       const extension = pendingAudioName.includes(".") ? `.${pendingAudioName.split(".").pop()?.toLowerCase()}` : ".mp3";
       const response = await fetch("/api/bgm", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAdminHeaders() },
         body: JSON.stringify({ audio: pendingAudioData, extension }),
       });
 
@@ -351,7 +358,10 @@ export default function App() {
   const handleResetBgm = async () => {
     try {
       setIsBgmUploading(true);
-      const response = await fetch("/api/bgm/reset", { method: "POST" });
+      const response = await fetch("/api/bgm/reset", {
+        method: "POST",
+        headers: getAdminHeaders(),
+      });
       if (!response.ok) {
         throw new Error("Could not reset soundtrack.");
       }
@@ -386,7 +396,10 @@ export default function App() {
 
     try {
       setLoading(true);
-      const response = await fetch("/api/cards/reset", { method: "POST" });
+      const response = await fetch("/api/cards/reset", {
+        method: "POST",
+        headers: getAdminHeaders(),
+      });
       if (!response.ok) {
         throw new Error("Could not reset templates.");
       }
@@ -473,7 +486,7 @@ export default function App() {
       if (uploadImageFile) {
         const uploadUrlResponse = await fetch("/api/cards/upload-url", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...getAdminHeaders() },
           body: JSON.stringify({
             filename: uploadImageFile.name,
             contentType: uploadImageFile.type || "application/octet-stream",
@@ -490,6 +503,7 @@ export default function App() {
           body: uploadImageFile,
           headers: {
             "Content-Type": uploadImageFile.type || "application/octet-stream",
+            ...getAdminHeaders(),
           },
         });
 
@@ -502,7 +516,7 @@ export default function App() {
 
       const response = await fetch("/api/cards", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAdminHeaders() },
         body: JSON.stringify({
           imageKey,
           text: uploadTitle.trim(),
@@ -553,7 +567,10 @@ export default function App() {
     }
 
     try {
-      const response = await fetch(`/api/cards/${cardId}`, { method: "DELETE" });
+      const response = await fetch(`/api/cards/${cardId}`, {
+        method: "DELETE",
+        headers: getAdminHeaders(),
+      });
       if (!response.ok) {
         const result = await response.json().catch(() => null);
         throw new Error(result?.error || "Unable to delete card.");

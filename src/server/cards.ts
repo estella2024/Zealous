@@ -1,0 +1,145 @@
+export type Card = {
+  id: string;
+  number: number;
+  image?: string;
+  text: string;
+  quote?: string;
+};
+
+export const SEED_IMAGE_MIGRATIONS: Record<string, string> = {
+  "/seed-assets/sketch/12-anti-vision.png": "/seed-assets/sketch/12-anti-vision-v2.jpg",
+  "/seed-assets/sketch/12-anti-vision.jpg": "/seed-assets/sketch/12-anti-vision-v2.jpg",
+  "/seed-assets/sketch/13-real-you.png": "/seed-assets/sketch/13-real-you-v2.jpg",
+  "/seed-assets/sketch/13-real-you.jpg": "/seed-assets/sketch/13-real-you-v2.jpg",
+};
+
+export const DEFAULT_CARDS: Card[] = [
+  {
+    id: "1",
+    number: 1,
+    image: "/seed-assets/sketch/01-boost-1-6x.png",
+    text: "1.6 倍人效下，雇谁更划算？",
+    quote: "使用 AI 的综合绩效提升至1.61 倍，我有一个基于单一数据的臆想……",
+  },
+  {
+    id: "2",
+    number: 2,
+    image: "/seed-assets/sketch/02-ability-x-influence.png",
+    text: "影响力是能力的放大器",
+    quote: "如果你是一根成熟的香蕉，那么适量的果蝇很有必要。",
+  },
+  {
+    id: "3",
+    number: 3,
+    image: "/seed-assets/sketch/03-ai-native.png",
+    text: "AI-native的核心还是人",
+    quote: "AI-native的设想很美好，但很长一段时间内，human依然是中心。",
+  },
+  {
+    id: "4",
+    number: 4,
+    image: "/seed-assets/sketch/04-a-union-b.png",
+    text: "Boolen之人生大义",
+    quote: "如果得到交集C才算成功，那人生路很窄。如果转向A和B，成功的可能性瞬间高起来。",
+  },
+  {
+    id: "5",
+    number: 5,
+    image: "/seed-assets/sketch/05-a-to-a4.png",
+    text: "全链路不是一条线性路",
+    quote: "我们的任务，不是修一条完美的高速公路，而是在这张网上布置足够多的节点和触点。",
+  },
+  {
+    id: "6",
+    number: 6,
+    image: "/seed-assets/sketch/06-communication-circles.png",
+    text: "Underdog要把钱花在刀刃上",
+    quote: "Lulu 针对underdog 提出的framework，对国内环境而言，可能过于理想化。",
+  },
+  {
+    id: "7",
+    number: 7,
+    image: "/seed-assets/sketch/07-motivation-matters.png",
+    text: "没有驱动的人只是工具",
+    quote: "大家处在同个 range 里时， motivation 才是赢的关键。",
+  },
+  {
+    id: "8",
+    number: 8,
+    image: "/seed-assets/sketch/08-problem-solving-paradigm.png",
+    text: "怎么才算真正解决了问题？",
+    quote: "picky的个性让我轻松做到前两步，却刻意省略第三步。",
+  },
+  {
+    id: "9",
+    number: 9,
+    image: "/seed-assets/sketch/09-the-golden-circle.png",
+    text: "知易行难，是因为开始就错了",
+    quote: "没有内核的东西，做得再好都不会有人买单。",
+  },
+  {
+    id: "10",
+    number: 10,
+    image: "/seed-assets/sketch/10-vector-life.png",
+    text: "向量思维是我乐观的底色",
+    quote: "在人生结束前，每一个点都足以画出新意义。",
+  },
+  {
+    id: "11",
+    number: 11,
+    image: "/seed-assets/sketch/11-z-dna.png",
+    text: "不完美的Z-DNA也很棒",
+    quote: "既然画不出流畅的双螺旋，做个韧性满满、随时代而变的Z型，也不错。",
+  },
+  {
+    id: "12",
+    number: 12,
+    image: "/seed-assets/sketch/12-anti-vision-v2.jpg",
+    text: "反愿景是一种稀缺资源",
+    quote: "如果 vision 是所有人都知道的方向，那么 anti-vision 就是那些还没有被说出口的反方向。",
+  },
+  {
+    id: "13",
+    number: 13,
+    image: "/seed-assets/sketch/13-real-you-v2.jpg",
+    text: "离开公司或平台，你还是你吗？",
+    quote:
+      "是「你」的，却不是「公司/平台」的能力，是什么？\n你的身份，\n是一个 passenger、一个 stakeholder、一个 autonomist？",
+  },
+];
+
+export function getSeedImageForCardNumber(number?: number) {
+  if (number === 12) return "/seed-assets/sketch/12-anti-vision-v2.jpg";
+  if (number === 13) return "/seed-assets/sketch/13-real-you-v2.jpg";
+  return null;
+}
+
+export function migrateSeedImagePath(image?: string) {
+  if (typeof image !== "string") return image;
+  return SEED_IMAGE_MIGRATIONS[image] ?? image;
+}
+
+export function normalizeCards(cards: Card[]) {
+  let changed = false;
+
+  const normalized = cards.map((card) => {
+    const nextSeedImage = getSeedImageForCardNumber(card.number);
+    let nextImage = migrateSeedImagePath(card.image);
+
+    if (nextSeedImage && typeof card.image === "string" && card.image.startsWith("data:image/")) {
+      nextImage = nextSeedImage;
+    }
+
+    if (nextImage !== card.image) {
+      changed = true;
+      return {
+        ...card,
+        image: nextImage,
+      };
+    }
+
+    return card;
+  });
+
+  return { cards: normalized, changed };
+}
