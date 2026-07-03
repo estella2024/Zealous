@@ -1,6 +1,6 @@
 import express from "express";
 import { createClient } from "@supabase/supabase-js";
-import { DEFAULT_CARDS, normalizeCards, type Card } from "../src/server/cards";
+import { DEFAULT_CARDS, normalizeCards, type Card } from "./cards-data.js";
 
 type CustomBgmMeta = {
   extension: string;
@@ -13,7 +13,7 @@ const app = express();
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || "zealous";
-const ADMIN_ACCESS_KEY = process.env.ADMIN_ACCESS_KEY || "21877273126080";
+const ADMIN_ACCESS_KEY = (process.env.ADMIN_ACCESS_KEY || "21877273126080").replace(/^"(.*)"$/, "$1");
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.warn("Supabase environment variables are missing. Vercel API storage is not configured.");
