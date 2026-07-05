@@ -11,6 +11,8 @@
 
 - Stable project entry document: `README.md`
 - AI-facing collaboration rules: `AGENTS.md`
+- Operational runbook: `docs/runbook.md`
+- Integration facts: `docs/integrations.md`
 - Continuous development log: add only when the project starts changing across multiple phases
 - Phase handoff summary: add only when a real phase boundary appears
 

@@ -21,6 +21,11 @@ Zealous is a lightweight gallery site with a front-end control board and a file-
 
 Use the main site in the built-in browser when discussing visual changes. When sharing progress, always provide a concrete browser-viewable address and prefer the simplest working address instead of adding extra preview-only entry points unless they are truly needed.
 
+## Operations Docs
+
+- [Runbook](docs/runbook.md): local checks, deployment flow, live probes, rollback, and common production issues.
+- [Integrations](docs/integrations.md): Vercel, Supabase, admin access, API route adapter rules, and production service facts.
+
 ## Vercel API routing
 
 The Vercel deployment keeps the backend implementation in `api/_server.ts`. Files under `api/` are thin Vercel route adapters that export that same server.
