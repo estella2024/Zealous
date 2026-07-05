@@ -399,7 +399,11 @@ app.delete("/api/cards/:id", async (req, res) => {
     await writeCards(cards);
     const assetKey = getCardAssetKeyFromUrl(removedCard?.image);
     if (assetKey) {
-      await deleteObject(assetKey);
+      try {
+        await deleteObject(assetKey);
+      } catch (error) {
+        console.warn("Card deleted, but failed to delete its image asset", error);
+      }
     }
     res.json({ message: "Card deleted, subsequent cards renumbered." });
   } catch (error) {

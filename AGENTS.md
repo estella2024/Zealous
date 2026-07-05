@@ -13,3 +13,10 @@
 - AI-facing collaboration rules: `AGENTS.md`
 - Continuous development log: add only when the project starts changing across multiple phases
 - Phase handoff summary: add only when a real phase boundary appears
+
+## Vercel API route adapters
+
+- Keep API implementation in `api/_server.ts`.
+- Treat files under `api/` as thin Vercel adapters only.
+- Whenever an Express route is added or changed in `api/_server.ts`, run `npm run check:api-routes` and add any missing adapter before deploy.
+- Before launch or deploy checks, verify dynamic API paths such as `DELETE /api/cards/:id` with a safe probe; do not assume the catch-all route covers them.
